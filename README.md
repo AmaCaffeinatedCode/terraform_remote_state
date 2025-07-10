@@ -1,48 +1,47 @@
 # Terraform Remote State Management
 
-## Project Description
+---
 
-This project establishes a centralized and robust Terraform remote state management solution using AWS services. It provisions an Amazon S3 bucket to securely store Terraform state files and an Amazon DynamoDB table to enable state locking, preventing concurrent modifications and ensuring consistency. The project also includes a CI/CD pipeline configured to automate Terraform workflows, with support for skipping pipeline runs via commit flags.
+## Project Overview
 
-## Architecture
+This project provisions a centralized and secure remote backend using AWS services to manage Terraform state. It creates an S3 bucket for storing state files and a DynamoDB table for state locking, enabling safe collaboration and consistent deployments across environments.
 
-- **S3 Bucket:** Central repository for all Terraform state files, organized by project and environment via key paths.  
-- **DynamoDB Table:** Implements state locking to avoid race conditions during Terraform operations.  
-- **Initial Bootstrap:** Uses the local backend to provision S3 and DynamoDB resources.  
-- **Remote Backend Migration:** After creation, the project switches to the remote S3 backend for its own state management.  
-- **CI/CD Pipeline:** Automates Terraform plan and apply operations with conditional execution based on commit messages.
+---
 
 ## Resources Created
+- AWS S3 bucket for storing Terraform state files  
+- AWS DynamoDB table for state locking  
 
-| Resource                             | Purpose                                         |
-|--------------------------------------|-------------------------------------------------|
-| `aws_s3_bucket.terraform_state`      | Stores all Terraform state files securely.      |
-| `aws_dynamodb_table.terraform_locks` | Provides locking mechanism for Terraform state. |
+## Backend Setup Process
+- Initialized local backend for bootstrapping  
+- Migrated backend to remote state after provisioning  
 
-## Workflow
+---
 
-1. **Bootstrap Phase:**  
-   - Execute Terraform with a local backend to provision the S3 bucket and DynamoDB table.
+## Usage
 
-2. **Backend Reconfiguration:**  
-   - Update the project to use the S3 backend for its own Terraform state.
+### 1. Environment variables
 
-3. **Consuming Projects:**  
-   - Configure other Terraform projects to use this centralized backend with isolated key prefixes, ensuring separate state files per project and environment.
+The GitHub Actions CI/CD pipeline uses the following secrets:
 
-4. **CI/CD Automation:**  
-   - Terraform plans and applies are automated through GitHub Actions workflows, with an option to skip pipeline runs by including a specific flag in commit messages.
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
 
-## Usage Instructions
+### 2. Deployment
 
-1. Clone and initialize the project:
+**Step 1: Bootstrap the backend**
+
+Before the remote backend can be used, it must be provisioned using a local backend. Clone the repository and run:
 
 ``` bash
 terraform init
+terraform plan
 terraform apply
 ```
 
-2. Update the backend configuration (`backend.tf`) to use the new S3 backend:
+**Step 2: Switch to the remote backend**
+
+After successful provisioning, update the `backend.tf` to point to the newly created S3 bucket and DynamoDB table:
 
 ``` hcl
 terraform {
@@ -56,7 +55,15 @@ terraform {
 }
 ```
 
-3. Configure all other Terraform projects to use the centralized backend with their own distinct key paths:
+Then reinitialize Terraform:
+
+``` bash
+terraform init -reconfigure
+```
+
+**Step 3: Use this backend in other projects**
+
+Other Terraform projects should reference the same backend, using a unique key per project and environment:
 
 ``` hcl
 terraform {
@@ -70,31 +77,44 @@ terraform {
 }
 ```
 
-## CI/CD Pipeline - Skip Execution with Commit Flag
+---
 
-To optimize workflow runs, this project supports skipping the CI/CD pipeline by including the flag `[skip-ci]` anywhere in your commit message. When this flag is detected, the Terraform workflow will not execute, saving resources and time during non-infrastructure-related commits.
+## CI/CD Pipeline
 
-Example:
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) is included to automate Terraform deployment on every push.
 
-``` bash
-git commit -m "Update documentation [skip-ci]"
-git push origin main
-```
+The pipeline:
+- Sets required environment variables  
+- Initializes Terraform  
+- Executes Terraform plan and apply to provision resources  
+- Detects `[skip-ci]` commit flag to optionally skip execution  
+
+It uses GitHub Actions environment secrets for secure authentication. 
+
+---
 
 ## Variables
 
-| Variable Name         | Description                                  | Example                                 |
-|-----------------------|----------------------------------------------|-----------------------------------------|
-| `aws_region`          | AWS Region where resources are deployed      | `us-east-1`                             |
-| `s3_bucket_name`      | Name of the S3 bucket for storing states     | `terraform-remote-state-central-bucket` |
-| `dynamodb_table_name` | Name of the DynamoDB table used for locking  | `terraform-remote-state-lock-table`     |
+| Variable             | Description                                  |
+|----------------------|----------------------------------------------|
+| aws_region           | AWS region for resource deployment           |
+| s3_bucket_name       | Name of the S3 bucket for state files        |
+| dynamodb_table_name  | Name of the DynamoDB table for locking       |
 
-## Cost and Performance Considerations
+---
 
-- The DynamoDB table is provisioned with minimal read/write capacity units (1 each) to optimize cost while ensuring reliable state locking.
-- Server-side encryption and versioning are enabled on the S3 bucket to protect state data and maintain historical versions.
+## Outputs
+
+| Name               | Description                                           |
+|--------------------|-------------------------------------------------------|
+| bucket_id          | The ID of the S3 bucket                               |
+| bucket_arn         | The ARN of the S3 bucket                              |
+| bucket_name        | The unique name of the S3 bucket                      |
+| dynamodb_table_name| The name of the DynamoDB table used for state locking |
+| dynamodb_table_arn | The ARN of the DynamoDB table                         |
+
+---
 
 ## Additional Notes
 
-- AWS credentials must be managed securely using environment variables, AWS config files, or secrets management in CI/CD pipelines.
-- The architecture ensures scalability, maintainability, and security for managing Terraform state across multiple projects and environments.
+- The backend must be provisioned using a local backend before switching to the remote configuration.

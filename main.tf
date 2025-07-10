@@ -3,7 +3,7 @@ resource "aws_s3_bucket" "terraform_state" {
 
   tags = {
     Name        = "Terraform Remote State Bucket"
-    Environment = "infrastructure"
+    Environment = "prod"
   }
 }
 
@@ -39,6 +39,6 @@ resource "aws_dynamodb_table" "terraform_locks" {
 
   tags = {
     Name        = "Terraform State Lock Table"
-    Environment = "infrastructure"
+    Environment = "prod"
   }
 }
